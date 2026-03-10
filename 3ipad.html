@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>たのしい分数ゲーム</title>
+
+<style>
+
+body{
+font-family:sans-serif;
+text-align:center;
+background:#f2f8ff;
+margin:0;
+overflow: hidden; /* スクロールを禁止 */
+}
+
+h1{
+font-size:28px;
+color: #e67e22;
+}
+
+#question{
+font-size:26px;
+margin:10px;
+}
+
+canvas{
+background:white;
+border-radius:20px;
+box-shadow:0 0 10px rgba(0,0,0,0.2);
+}
+.locked { pointer-events: none; opacity: 0.7; }
+
+button{
+font-size:22px;
+padding:10px 20px;
+margin:10px;
+border:none;
+border-radius:10px;
+background:#4CAF50;
+color:white;
+cursor: pointer; /* カーソルをポインターに */
+}
+
+/* 分数表示用のスタイル */
+.frac { display: inline-flex; flex-direction: column; vertical-align: middle; align-items: center; font-weight: bold; line-height: 1; }
+.num { border-bottom: 2px solid currentColor; padding: 0 5px; }
+.den { padding: 0 5px; }
+
+button:active {
+    transform: translateY(2px);
+}
+
+#message{
+font-size:24px;
+margin-top:10px;
+height:30px;
+}
+.msg-correct { color: #e91e63; font-weight: bold; }
+.msg-wrong { color: #2196f3; }
+
+</style>
+</head>
+
+<body>
+
+<h1>🍕 分数ゲーム</h1>
+
+<div id="question"></div>
+
+<canvas id="game" width="320" height="320"></canvas>
+
+<div id="message"></div>
+
+<button onclick="nextQuestion()">つぎのもんだい</button>
+
+<script>
+
+window.onload = function() {
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let slices = [];
+let selected = [];
+
+let numerator; // 問題の分子
+let denominator; // 問題の分母
+let isLocked = false; // 正解後に操作をロックするフラグ
+
+function nextQuestion(){
+
+selected=[];
+isLocked = false;
+
+const problems=[
+[1,2],
+[1,3],
+[2,3],
+[1,4],
+[3,4],
+[5,6],
+[1,8],
+[3,8]
+];
+
+let p = problems[Math.floor(Math.random()*problems.length)];
+
+numerator = p[0];
+denominator = p[1];
+
+document.getElementById("question").innerHTML = 
+    `<span class="frac"><span class="num">${numerator}</span><span class="den">${denominator}</span></span> はどれ？`;
+
+createPizza();
+canvas.classList.remove("locked");
+draw();
+
+document.getElementById("message").innerHTML="";
+
+}
+
+function createPizza(){
+
+slices=[];
+
+let angle = (Math.PI*2)/denominator;
+
+for(let i=0;i<denominator;i++){
+
+slices.push({
+start:i*angle,
+end:(i+1)*angle
+});
+
+}
+
+}
+
+function draw(){
+
+ctx.clearRect(0,0,320,320);
+
+let cx=160;
+let cy=160;
+let r=120;
+
+for(let i=0;i<slices.length;i++){
+
+ctx.beginPath();
+ctx.moveTo(cx,cy);
+ctx.arc(cx,cy,r,slices[i].start,slices[i].end);
+ctx.closePath();
+
+if(selected.indexOf(i) !== -1){
+ctx.fillStyle="#ffcc66";
+}else{
+ctx.fillStyle="#ffeaa7";
+}
+
+ctx.fill();
+ctx.strokeStyle = "white"; // 境界線を見やすく
+ctx.lineWidth = 2;
+ctx.stroke();
+
+}
+
+}
+
+function handleInput(e) {
+    if(isLocked) return; // ロック中は操作不可
+    e.preventDefault(); // ダブルタップズームなどを防ぐ
+
+let rect = canvas.getBoundingClientRect();
+let clientX = e.clientX;
+let clientY = e.clientY;
+
+if (e.touches && e.touches.length > 0) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+}
+
+let x = (clientX - rect.left) - 160;
+let y = (clientY - rect.top) - 160;
+
+// クリックされた角度を計算
+let angle = Math.atan2(y,x);
+
+if(angle<0) angle += Math.PI*2;
+
+let slice = Math.floor(angle / ((Math.PI*2)/denominator));
+
+if(selected.indexOf(slice) !== -1){
+    // 選択解除
+    selected = selected.filter(function(v){ return v!==slice; });
+}else{
+    // 選択
+    selected.push(slice);
+}
+
+draw();
+checkAnswer();
+
+}
+
+canvas.addEventListener("mousedown", handleInput);
+canvas.addEventListener("touchstart", handleInput, {passive: false});
+
+function checkAnswer(){
+    const msg = document.getElementById("message");
+
+if(selected.length===numerator && !isLocked){
+        msg.innerHTML="<span class='msg-correct'>🎉 せいかい！</span>";
+        isLocked = true; // 操作をロック
+        canvas.classList.add("locked");
+
+} else if (selected.length > numerator) {
+        msg.innerHTML = "<span class='msg-wrong'>選びすぎだよ！</span>";
+
+} else {
+        // 正解でも間違いでもない場合はメッセージを消す
+        msg.innerHTML = "";
+
+}
+
+}
+
+window.nextQuestion = nextQuestion;
+
+nextQuestion();
+
+};
+</script>
+
+</body>
+</html>
+もちろんです。以下にHTMLファイル全体のコードを示します。
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>画像の表示</title>
+  <style>
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <img src="画像のURL" alt="画像の説明">
+</body>
+</html>
+```
+
+このコードを使用することで、Safariの簡易表示でも画像が適切に表示されるようになります。ただし、`<img>`要素の`src`属性には実際の画像のURLを指定する必要があります。
