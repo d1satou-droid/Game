@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ピッタリ！ピザチャレンジ</title>
+    <style>
+        :root {
+            --bg-color: #fffaf0;
+            --pizza-ear: #e67e22;
+            --guide-color: #e0e0e0;
+            --hint-color: rgba(241, 196, 15, 0.4);
+            --success-color: #27ae60;
+            --stamp-red: #ff4a4a;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background: var(--bg-color); 
+            text-align: center; 
+            padding: 10px; 
+            color: #333; 
+            margin: 0; 
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased; /* Safari 文字化け・かすれ対策 */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        .game-title {
+            background: linear-gradient(to bottom, #ff4757, #d35400);
+            color: white; display: inline-block; padding: 8px 20px; border-radius: 50px;
+            box-shadow: 0 4px 0 #a33c00; margin: 10px 0;
+        }
+        .game-title h1 { margin: 0; font-size: clamp(18px, 5vw, 24px); }
+
+        .container { 
+            width: 95%; max-width: 460px; margin: 0 auto; background: white; 
+            padding: 15px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            box-sizing: border-box;
+        }
+
+        .status-bar {
+            display: flex; justify-content: center; align-items: center; gap: 15px;
+            background: #f8f9fa; padding: 10px; border-radius: 15px; margin-bottom: 15px;
+        }
+        .status-item { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+        .status-label { font-size: 12px; color: #666; font-weight: bold; }
+
+        /* 分数表示の崩れ防止 */
+        .frac { display: inline-flex; flex-direction: column; vertical-align: middle; align-items: center; font-weight: 900; line-height: 1.1; }
+        .num { border-bottom: 2px solid currentColor; padding: 0 3px; min-width: 20px; }
+        .den { padding: 0 3px; min-width: 20px; }
+        
+        #goalDisp .frac, #curDisp .frac { font-size: clamp(24px, 8vw, 32px); }
+        #goalDisp .frac { color: #d35400; }
+        #curDisp .frac { color: #27ae60; }
+        .zero-display { font-size: clamp(24px, 8vw, 32px); font-weight: 900; color: #27ae60; }
+
+        #pizza-stage {
+            width: 100%; max-width: 280px; aspect-ratio: 1 / 1;
+            background: #eee; border-radius: 50%; margin: 15px auto; 
+            position: relative; display: flex; align-items: center; justify-content: center;
+        }
+
+        #pizza { 
+            width: 92%; height: 92%; border-radius: 50%; 
+            border: 10px solid var(--pizza-ear); background: var(--guide-color); 
+            position: relative; overflow: hidden; z-index: 1;
+            transform: translateZ(0); /* Safari clipping fix */
+        }
+        /* 正解時のアニメーション */
+        .is-success-anim { animation: success-jump 0.8s; }
+
+        .ingredient-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            pointer-events: none; z-index: 5; opacity: 0.9;
+        }
+
+        /* canvasを具材レイヤー(z-index:5)の下に配置し、重なりによる問題を回避 */
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 4; opacity: 0; pointer-events: none; }
+        canvas.is-correct { opacity: 1; }
+
+        @keyframes success-jump {
+            50% { transform: translateY(-15px) rotate(5deg); }
+        }
+
+        /* ボタン */
+        .btn-list { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .p-btn { 
+            width: 65px; height: 65px; border-radius: 50%; border: 2px solid #ddd; 
+            background: white; cursor: pointer; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+        }
+        .btn-pie { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.3; }
+        .btn-text { position: relative; z-index: 2; font-size: 14px; }
+
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 8px; }
+        button.action { padding: 10px 15px; border-radius: 50px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .undo { background: #95a5a6; }
+        .hint-btn { background: #f39c12; }
+        .next { background: var(--success-color); flex-grow: 1; }
+        .next:disabled { background: #ccc; }
+
+        #clear-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; display: none; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 9999;
+        }
+        #clear-overlay.active { display: flex; }
+
+        #final-stamp-svg { width: 80%; max-width: 300px; height: auto; }
+        .stamp-red-stroke { fill: none; stroke: var(--stamp-red); stroke-width: 12; }
+        .stamp-red-fill { fill: var(--stamp-red); }
+        .stamp-text-svg { fill: var(--stamp-red); font-size: 40px; font-weight: bold; }
+        #clear-message { margin-top: 20px; font-size: 22px; font-weight: bold; color: #d35400; }
+        #restart-btn { margin-top: 25px; padding: 12px 30px; font-size: 18px; background: #ff4757; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 0 #b3303c; }
+    </style>
+</head>
+<body>
+
+<div class="game-title"><h1>ピッタリ！ピザチャレンジ</h1></div>
+
+<div class="container">
+    <div id="qNum" style="font-weight: bold; color: #666; margin-bottom: 8px;">第 1 / 10 問</div>
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label">ちゅうもん</span>
+            <div id="goalDisp"></div>
+        </div>
+        <div style="font-size: 24px; color: #ccc;">|</div>
+        <div class="status-item">
+            <span class="status-label">いま</span>
+            <div id="curDisp"></div>
+        </div>
+    </div>
+    
+    <div id="pizza-stage">
+        <div id="pizza">
+            <div id="hint-layer" class="ingredient-layer" style="background: var(--hint-color); display: none;"></div>
+            <canvas id="pizza-canvas" width="300" height="300"></canvas>
+        </div>
+    </div>
+    <div id="message" style="height: 30px; font-weight: bold;"></div>
+    <div class="btn-list" id="btnList"></div>
+    <div class="controls">
+        <button class="action undo" onclick="undo()">もどす</button>
+        <button class="action hint-btn" onclick="toggleHint()">ヒント</button>
+        <button id="nextBtn" class="action next" onclick="checkNext()" disabled>つぎへ！</button>
+    </div>
+</div>
+
+<div id="clear-overlay">
+    <svg id="final-stamp-svg" viewBox="0 0 400 400">
+        <circle class="stamp-red-stroke" cx="200" cy="200" r="180" />
+        <circle class="stamp-red-stroke" cx="200" cy="200" r="160" stroke-width="4" />
+        <text x="50%" y="130" text-anchor="middle" class="stamp-text-svg">たいへん</text>
+        <text x="50%" y="205" text-anchor="middle" class="stamp-text-svg">よくでき</text>
+        <text x="50%" y="280" text-anchor="middle" class="stamp-text-svg">ました！</text>
+        <path class="stamp-red-fill" d="M200,310 l8,15 h16 l-13,10 l5,16 l-16-10 l-16,10 l5-16 l-13-10 h16 z" transform="translate(0,-10)"/>
+    </svg>
+    <div id="clear-message">ピザマスターだね！</div>
+    <button id="restart-btn" onclick="location.reload()">もういちど あそぶ</button>
+</div>
+
+<script>
+    const ingredientConfig = { 2: "#ff4757", 3: "#2ecc71", 4: "#f1c40f", 6: "#9b59b6", 8: "#34495e" };
+    const goalList = [[1,2], [2,3], [3,4], [1,1], [5,6], [3,8], [5,8], [2,4], [4,6], [7,8]];
+    let current = [0, 1], goal = [1, 2], stack = [], qCount = 1, isHintOpen = false;
+
+    function fHTML(n, d, isCurrent = false) {
+        if (isCurrent && n === 0) return `<div class="zero-display">0</div>`;
+        return `<div class="frac"><span class="num">${n}</span><span class="den">${d}</span></div>`;
+    }
+
+    function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+    function add(a, b) {
+        let n = a[0] * b[1] + b[0] * a[1], d = a[1] * b[1], g = gcd(n, d);
+        return [n/g, d/g];
+    }
+    function sub(a, b) {
+        let n = a[0] * b[1] - b[0] * a[1], d = a[1] * b[1], g = gcd(n, d);
+        return n <= 0 ? [0, 1] : [n/g, d/g];
+    }
+
+    // ボタンの作成
+    const list = document.getElementById("btnList");
+    [[1,2], [1,3], [1,4], [1,6], [1,8]].forEach(f => {
+        const b = document.createElement("button");
+        b.className = "p-btn";
+        const pie = document.createElement("div");
+        pie.className = "btn-pie";
+        // Safari用に背景グラデーションを調整
+        pie.style.background = `conic-gradient(${ingredientConfig[f[1]]} 0% ${(f[0]/f[1])*100}%, transparent ${(f[0]/f[1])*100}% 100%)`;
+        b.innerHTML = `<div class="btn-text">${fHTML(f[0], f[1])}</div>`;
+        b.appendChild(pie);
+        b.onclick = () => {
+            if (document.getElementById("pizza-canvas").classList.contains("is-correct")) return;
+            const next = add(current, [1, f[1]]);
+            if (next[0]/next[1] > goal[0]/goal[1] + 0.001) {
+                document.getElementById("message").innerHTML = '<span style="color:#ff4757">多くなりすぎ！</span>';
+                return;
+            }
+            current = next;
+            stack.push({ val: [1, f[1]], col: ingredientConfig[f[1]] });
+            render();
+        };
+        list.appendChild(b);
+    });
+
+    // Safari対応のClipPath生成
+    function setClip(el, startRatio, endRatio) {
+        const startDeg = startRatio * 360 - 90;
+        const endDeg = endRatio * 360 - 90;
+        let p = ["50% 50%"];
+        for (let i = startDeg; i <= endDeg; i += 2) {
+            const rad = i * (Math.PI / 180);
+            p.push(`${(50 + 50 * Math.cos(rad)).toFixed(2)}% ${(50 + 50 * Math.sin(rad)).toFixed(2)}%`);
+        }
+        const endRad = endDeg * (Math.PI / 180);
+        p.push(`${(50 + 50 * Math.cos(endRad)).toFixed(2)}% ${(50 + 50 * Math.sin(endRad)).toFixed(2)}%`, "50% 50%");
+        const poly = `polygon(${p.join(",")})`;
+        el.style.webkitClipPath = poly;
+        el.style.clipPath = poly;
+    }
+
+    function toggleHint() {
+        isHintOpen = !isHintOpen;
+        const hl = document.getElementById("hint-layer");
+        hl.style.display = isHintOpen ? "block" : "none";
+        if (isHintOpen) setClip(hl, 0, goal[0]/goal[1]);
+    }
+
+    function render() {
+        const pizza = document.getElementById("pizza");
+        const canvas = document.getElementById("pizza-canvas");
+        const nextBtn = document.getElementById("nextBtn");
+        pizza.querySelectorAll(".added-layer").forEach(l => l.remove());
+
+        let start = 0;
+        stack.forEach(s => {
+            const ratio = s.val[0]/s.val[1];
+            const layer = document.createElement("div");
+            layer.className = "ingredient-layer added-layer";
+            layer.style.background = s.col;
+            setClip(layer, start, start + ratio);
+            pizza.appendChild(layer);
+            start += ratio;
+        });
+
+        document.getElementById("curDisp").innerHTML = fHTML(current[0], current[1], true);
+        
+        if (Math.abs(current[0]/current[1] - goal[0]/goal[1]) < 0.001) {
+            drawArt();
+            canvas.classList.add("is-correct");
+            pizza.classList.add("is-success-anim");
+            nextBtn.disabled = false;
+            document.getElementById("message").innerHTML = '<span style="color:#e67e22">ピッタリ！</span>';
+            // 正解アートを見せるため、上にある具材レイヤーを非表示にする
+            pizza.querySelectorAll(".added-layer, #hint-layer").forEach(l => l.style.display = 'none');
+        } else {
+            canvas.classList.remove("is-correct");
+            pizza.classList.remove("is-success-anim");
+            nextBtn.disabled = true;
+            document.getElementById("message").innerHTML = '';
+        }
+    }
+
+    function drawArt() {
+        const canvas = document.getElementById("pizza-canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0,0,300,300);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(150, 150);
+        ctx.arc(150, 150, 130, -Math.PI/2, -Math.PI/2 + (Math.PI*2*(goal[0]/goal[1])), false);
+        ctx.clip();
+        ctx.fillStyle = "#f1c40f"; 
+        ctx.fill();
+        // 具材を描画
+        for(let i=0; i<20; i++){
+            ctx.fillStyle = (Math.random()>0.5)?"#c0392b":"#27ae60";
+            ctx.beginPath();
+            ctx.arc(150+Math.random()*200-100, 150+Math.random()*200-100, 8, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function undo() {
+        if (stack.length === 0 || document.getElementById("pizza-canvas").classList.contains("is-correct")) return;
+        const last = stack.pop();
+        current = sub(current, last.val);
+        render();
+    }
+
+    function checkNext() {
+        if (qCount >= 10) {
+            document.getElementById("clear-overlay").classList.add("active");
+            return;
+        }
+        qCount++;
+        document.getElementById("qNum").innerText = `第 ${qCount} / 10 問`;
+        startRound();
+    }
+
+    function startRound() {
+        current = [0, 1]; stack = []; isHintOpen = false;
+        document.getElementById("hint-layer").style.display = "none";
+        // 前の問題で非表示にした具材を再表示させる
+        pizza.querySelectorAll(".added-layer").forEach(l => l.style.display = 'block');
+        goal = goalList[Math.floor(Math.random() * goalList.length)];
+        document.getElementById("goalDisp").innerHTML = fHTML(goal[0], goal[1]);
+        render();
+    }
+
+    window.onload = startRound;
+</script>
+</body>
+</html>
